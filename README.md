@@ -2,6 +2,6 @@
 A little trick to edit obsidian in nvim
 
 ------
-# usage 
+# link jump
 - `require 'obsidian`
 - `nnoremap <silent> <expr> <enter>  &filetype=='markdown' ? ':Olink<cr>': '<enter>'`
