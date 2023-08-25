@@ -3,7 +3,8 @@ A little trick to edit obsidian in nvim
 
 -----
 ## Requirements
-[plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
+- [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
+
 ------
 ## link jump
 - `require 'obsidian`
