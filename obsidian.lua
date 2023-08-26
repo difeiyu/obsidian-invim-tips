@@ -21,7 +21,7 @@ end
 --open link_file and try jump to title--
 ---@param filename string:  full file path 
 ---@param title string   :  title
-local function locate(filename, title)
+local function locate_title(filename, title)
   if not title then
     vim.cmd('edit '..filename)
     return
@@ -31,10 +31,17 @@ local function locate(filename, title)
     vim.notify("read "..filename.."failed", ERROR)
     return
   end
+  local luare
   local line_number = 1
+  if string.match(title, '^%^') then
+    luare = '%^('..string.rep("%w", #title-1)..')'
+    title = string.sub(title, 2, -1)
+  else
+    luare = '^#+ +('..string.rep('.', #title)..')$'
+  end
   for line in handle:lines() do
-    local match = string.match(line, '^#+ +(.*)$')
-    if match and string.sub(match, 1, #title)==title then
+    local match = string.match(line, luare)
+    if match and match==title then
       vim.cmd('edit +'..line_number..' '..filename)
       io.close(handle)
       return
@@ -64,7 +71,7 @@ local function link_note(str)
       vim.cmd('edit '..filename)
       return filename
     elseif vim.fn.filereadable(filename..'.md')==1 then
-      locate(filename..'.md', title)
+      locate_title(filename..'.md', title)
       return filename
     end
     --try failed then scandir--
@@ -74,7 +81,7 @@ local function link_note(str)
         vim.cmd('edit '..files_path)
         return files_path
       elseif file_name == name..'.md' then
-        locate(files_path, title)
+        locate_title(files_path, title)
         return files_path
       end
     end
@@ -84,6 +91,7 @@ local function link_note(str)
   vim.notify("No file "..str, ERROR)
 end
 
+---@param url string:  [...](url)
 local function link_url(url)
   local TRUE
   if vim.fn.filereadable(url)==1 then
@@ -102,35 +110,40 @@ local function link_url(url)
   end
 end
 
--- no implement
-local function link_footnote()
-  -- vim.cmd([[silent! normal! G]])
+---@param str string:  [^str] or ^[str]
+local function link_footnote(str)
+  local content = vim.api.nvim_buf_get_lines(0, 0, vim.api.nvim_buf_line_count(0), false)
+  for line_number,line in pairs(content) do
+    if string.match(line, '^%[%^'..str..'%]:') then
+      vim.cmd('silent! normal! '..line_number..'gg')
+      break
+    end
+  end
 end
 
 -- open obsidian link :link_note, link_url, link_footnote
 function obsidian_tips.obsidianopenlink()
-  vim.cmd([[silent! normal! va[l]])
+  local start_line_number, start_line_col = unpack(vim.api.nvim_win_get_cursor(0))
+  vim.cmd([[silent! normal! va[loh]])
   local v_select_origin = buf_vtext()
   local last_c = string.sub(v_select_origin, -1, -1)
-  local v_select = string.sub(v_select_origin, 1, -2)
-  v_select = string.match(v_select, '%[([^%[%]]*)%]')
-
-  if last_c == '(' then
-    vim.cmd([[silent! exec "normal! \<esc>vi("]])
+  local double_brackets=string.match(v_select_origin,'%[%[([^%[%]]*)%]%]')
+  local is_foot_link = string.match(v_select_origin, '[[^][%^[]([^%]]*)')
+    
+  vim.cmd([[silent! exec "normal! \<esc>l"]])
+  if vim.fn.getpos('.')[2] ~= start_line_number then
+    vim.notify("not valid link.", WARN)
+  elseif double_brackets then
+    return link_note(double_brackets)
+  elseif is_foot_link then
+    return link_footnote(is_foot_link)
+  elseif last_c == '(' then
+    vim.cmd([[silent! normal! vi(]])
     link_url(buf_vtext())
-  elseif last_c == '[' then
-    vim.cmd([[silent! exec "normal! \<esc>vi["]])
-    -- link_footnote()
-  elseif last_c == ']' then
-    link_note(v_select)
   else
-    local double_brackets=string.match(v_select_origin,'%[%[([^%[%]]*)%]%]')
-    if double_brackets then
-      link_note(double_brackets)
-    else
-      vim.notify("not valid link.", WARN)
-    end
+    vim.notify("not valid link.", WARN)
   end
+  vim.api.nvim_win_set_cursor(0,{start_line_number, start_line_col})
   vim.cmd([[silent! exec "normal! \<esc>"]])
 end
 
